@@ -1,0 +1,21 @@
+data:
+  file_limit: null
+  patterns:
+    - '*_processado_ti.parquet'
+    - '*_processado_ti.csv'
+  sample_frac: 0.5
+  stratify: true
+  target_column: vinculo_ativo_31/12
+  test_data_path: C:\TCC\dados\rais\preprocessados
+  test_size: 0.2
+  train_data_path: C:\TCC\dados\rais\preprocessados
+logging:
+  level: INFO
+  log_file: logs/project.log
+model:
+  max_depth: 10
+  min_samples_leaf: 1
+  min_samples_split: 2
+  n_estimators: 100
+  random_state: 42
+  type: RandomForest

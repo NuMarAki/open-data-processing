@@ -1,6 +1,4 @@
 class RandomForestModel:
-    """Random Forest wrapper using scikit-learn (CPU only)."""
-
     def __init__(self, n_estimators=100, max_depth=None, random_state=None):
         from sklearn.ensemble import RandomForestClassifier as skRF
         self.impl = skRF(n_estimators=n_estimators, max_depth=max_depth, random_state=random_state)

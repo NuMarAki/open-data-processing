@@ -1,25 +1,7 @@
 import os
 import sys
 import time
-
-# Ensure repository root is on sys.path so `import src...` works when running this file directly
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
-
-# Helpful check for PyYAML
-try:
-    import yaml
-except ModuleNotFoundError:
-    msg = (
-        "Module 'yaml' (PyYAML) is not installed.\n"
-        "Install it for the Python you're using with:\n"
-        f"  {sys.executable} -m pip install pyyaml\n"
-        "or install all project requirements:\n"
-        f"  {sys.executable} -m pip install -r requirements.txt\n"
-    )
-    print(msg, file=sys.stderr)
-    sys.exit(1)
+import yaml
 
 from src.data.loader import load_data
 from src.data.preprocessing import preprocess_data
@@ -30,15 +12,14 @@ import pandas as pd
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, average_precision_score, confusion_matrix,
-    classification_report, balanced_accuracy_score
+    classification_report, balanced_accuracy_score,
+    roc_curve, precision_recall_curve
 )
 
-# Optional plotting imports
 try:
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    from sklearn.metrics import roc_curve, precision_recall_curve
     PLOTS_AVAILABLE = True
 except ImportError:
     PLOTS_AVAILABLE = False
@@ -48,25 +29,22 @@ def _now():
 
 def main():
     print(f"[{_now()}] Starting main()", flush=True)
-
-    # Load configuration parameters
-    print(f"[{_now()}] Loading config/params.yaml", flush=True)
+    
     with open(os.path.join('config', 'params.yaml'), 'r') as file:
         params = yaml.safe_load(file)
-
-    # Load and preprocess data
+    
     data_path = params['data'].get('train_data_path') or params['data'].get('path')
     patterns = params['data'].get('patterns')
     sample_frac = params['data'].get('sample_frac')
     file_limit = params['data'].get('file_limit')
 
-    print(f"[{_now()}] Starting to load data from {data_path} patterns={patterns} file_limit={file_limit}", flush=True)
+    print(f"[{_now()}] Loading data from {data_path}", flush=True)
     t_load0 = time.perf_counter()
     data = load_data(data_path, patterns=patterns, file_limit=file_limit)
     t_load = time.perf_counter() - t_load0
     print(f"[{_now()}] Data loaded rows={len(data)} cols={len(data.columns)} — time={t_load:.2f}s", flush=True)
 
-    print(f"[{_now()}] Starting preprocessing", flush=True)
+    print(f"[{_now()}] Preprocessing data", flush=True)
     t0 = time.perf_counter()
     X_train, y_train, X_test, y_test, preprocessor = preprocess_data(
         data,
@@ -80,13 +58,10 @@ def main():
     t_pre = time.perf_counter() - t0
     print(f"[{_now()}] Preprocessing complete. X_train: {X_train.shape}, X_test: {X_test.shape} — time={t_pre:.2f}s", flush=True)
 
-    print(f"[{_now()}] Initializing RandomForestModel (CPU)", flush=True)
-
     model_path = os.path.join('artifacts', 'model.joblib')
     retrain_needed = True
     model = None
     if os.path.exists(model_path):
-        print(f"[{_now()}] Found existing model at {model_path}, inspecting for compatibility...", flush=True)
         try:
             loaded = joblib.load(model_path)
             impl = getattr(loaded, 'impl', None)
@@ -100,15 +75,10 @@ def main():
 
             if importances is not None and feature_names is not None:
                 if len(importances) == len(feature_names):
-                    print(f"[{_now()}] Existing model is compatible with current preprocessor — loading model.", flush=True)
                     model = loaded
                     retrain_needed = False
-                else:
-                    print(f"[{_now()}] Saved model feature count ({len(importances)}) != current feature count ({len(feature_names)}). Will retrain.", flush=True)
-            else:
-                print(f"[{_now()}] Could not verify saved model compatibility. Forcing retrain.", flush=True)
-        except Exception as e:
-            print(f"[{_now()}] Failed to load existing model ({e}). Will retrain.", flush=True)
+        except Exception:
+            pass
 
     if retrain_needed:
         model = RandomForestModel(
@@ -119,19 +89,14 @@ def main():
 
         if preprocessor is not None:
             os.makedirs('artifacts', exist_ok=True)
-            print(f"[{_now()}] Saving preprocessor to artifacts/preprocessor.joblib", flush=True)
             joblib.dump(preprocessor, os.path.join('artifacts', 'preprocessor.joblib'))
-            print(f"[{_now()}] Saved preprocessor to artifacts/preprocessor.joblib", flush=True)
 
-        print(f"[{_now()}] Starting model training...", flush=True)
+        print(f"[{_now()}] Training model", flush=True)
         t_train0 = time.perf_counter()
         model.fit(X_train, y_train)
         t_train = time.perf_counter() - t_train0
         print(f"[{_now()}] Model training finished — time={t_train:.2f}s", flush=True)
-
-        print(f"[{_now()}] Saving trained model to {model_path}", flush=True)
         joblib.dump(model, model_path)
-        print(f"[{_now()}] Model saved successfully", flush=True)
 
     if hasattr(model.impl, 'feature_importances_'):
         feature_names = preprocessor.get_feature_names_out()
@@ -144,9 +109,8 @@ def main():
         for idx, row in feature_importance_df.head(10).iterrows():
             print(f"  {row['feature']}: {row['importance']:.4f}", flush=True)
         feature_importance_df.to_csv("artifacts/feature_importance.csv", index=False)
-        print(f"[{_now()}] Feature importance saved to artifacts/feature_importance.csv", flush=True)
 
-    print(f"[{_now()}] Making predictions on X_test (n={len(X_test)})", flush=True)
+    print(f"[{_now()}] Computing metrics", flush=True)
     predictions = model.predict(X_test)
     y_proba = model.predict_proba(X_test)[:, 1] if hasattr(model, 'predict_proba') else predictions
 
@@ -206,8 +170,8 @@ def main():
             plt.savefig('artifacts/pr_curve.png')
             plt.close()
             print(f"[{_now()}] Saved ROC and PR curves to artifacts/", flush=True)
-        except Exception as e:
-            print(f"[{_now()}] Skipped plotting due to error: {e}", flush=True)
+        except Exception:
+            pass
 
     print(f"[{_now()}] Finished main()", flush=True)
 

@@ -16,8 +16,6 @@ def _clean_col(name: str) -> str:
     return name
 
 class FrequencyEncoder(BaseEstimator, TransformerMixin):
-    """Encodes categories as their frequency (relative count) computed on fit."""
-
     def __init__(self):
         self.maps = None
 

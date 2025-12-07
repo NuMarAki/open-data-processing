@@ -59,9 +59,6 @@ def clean_data(data: pd.DataFrame) -> pd.DataFrame:
         cleaned_data = cleaned_data.drop(columns=to_drop)
     return cleaned_data
 
-def transform_data(data: pd.DataFrame) -> pd.DataFrame:
-    return data
-
 def preprocess_data(
     data: pd.DataFrame,
     target_column: str,
@@ -75,7 +72,6 @@ def preprocess_data(
         raise ValueError("Empty input data")
 
     df = clean_data(data)
-    df = transform_data(df)
     df = _clean_feature_values(df)
 
     cleaned_target = _clean_col(target_column)

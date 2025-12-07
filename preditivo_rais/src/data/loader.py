@@ -64,7 +64,6 @@ def load_data_from_dir(dir_path: str, patterns: Optional[List[str]] = None, file
                 print(f"Read file {i}/{total_files} ({os.path.basename(fp)}), time={elapsed:.2f}s")
 
     if not all_frames:
-        print(f"No files matched patterns in {dir_path}")
         return pd.DataFrame()
 
     df = pd.concat(all_frames, ignore_index=True)

@@ -31,6 +31,20 @@ class ConfigBase:
     # Campos específicos da RAIS
     colunas_rais: Optional[dict] = None
     cbo_ti: Optional[List[str]] = None
+    # Novos campos de processamento
+    forcar_sequencial: bool = False
+    usar_chunking: bool = False
+    tamanho_chunk: int = 100000
+    # Limites de memória
+    limite_memoria_mb: int = 8192
+    forcar_limpeza_memoria: bool = True
+    percentual_max_memoria: int = 80
+    # Caminhos adicionais
+    caminho_resultados: Optional[str] = None
+    rotulo_fonte: Optional[str] = None
+    # Filtros de análise
+    filtros_analise: Optional[Dict[str, Any]] = None
+    faixas_etarias: Optional[Dict[str, tuple]] = None
     
 
 class ConfigManager:
@@ -77,15 +91,39 @@ class ConfigManager:
         """Extrai configurações comuns"""
         base_config = {
             'tipo': tipo,
-            'caminho_arquivos_compactados': config.get('caminhos_processamento', 'caminho_arquivos_compactados', fallback=''),
-            'caminho_destino': config.get('caminhos_processamento', 'caminho_descompactacao', fallback=f'dados/{tipo}'),
+            'caminho_arquivos_compactados': config.get('caminhos', 'caminho_arquivos_compactados', 
+                                                       fallback=config.get('caminhos_processamento', 'caminho_arquivos_compactados', fallback='')),
+            'caminho_destino': config.get('caminhos', 'caminho_descompactacao',
+                                         fallback=config.get('caminhos_processamento', 'caminho_descompactacao', fallback=f'dados/{tipo}')),
         }
         
+        # Caminhos adicionais
+        if config.has_section('caminhos'):
+            base_config['caminho_resultados'] = config.get('caminhos', 'caminho_resultados', fallback=None)
+            base_config['rotulo_fonte'] = config.get('caminhos', 'rotulo_fonte', fallback=None)
+        
         # Parâmetros de leitura
-        if config.has_section('parametros_leitura_txt'):
+        if config.has_section('parametros_leitura'):
+            base_config.update({
+                'delimitador': config.get('parametros_leitura', 'delimitador', fallback=';'),
+                'encoding': config.get('parametros_leitura', 'encoding', fallback='utf-8'),
+                'usar_chunking': config.getboolean('parametros_leitura', 'usar_chunking', fallback=False),
+                'tamanho_chunk': config.getint('parametros_leitura', 'tamanho_chunk', fallback=100000)
+            })
+        elif config.has_section('parametros_leitura_txt'):
             base_config.update({
                 'delimitador': config.get('parametros_leitura_txt', 'delimitador', fallback=';'),
                 'encoding': config.get('parametros_leitura_txt', 'encoding', fallback='utf-8')
+            })
+        
+        # Parâmetros de processamento
+        if config.has_section('parametros_processamento'):
+            base_config.update({
+                'usar_paralelo': config.getboolean('parametros_processamento', 'usar_paralelo', fallback=True),
+                'max_workers': config.getint('parametros_processamento', 'max_workers', fallback=4) or None,
+                'batch_size': config.getint('parametros_processamento', 'batch_size', fallback=3),
+                'amostra_registros': config.getint('parametros_processamento', 'amostra_registros', fallback=0),
+                'forcar_sequencial': config.getboolean('parametros_processamento', 'forcar_sequencial', fallback=False)
             })
         
         # Período de análise
@@ -95,15 +133,36 @@ class ConfigManager:
                 'ano_fim': config.getint('periodo_analise', 'ano_fim', fallback=2025)
             })
         
-        # Debug/Otimização
+        # Limites de memória
+        if config.has_section('memoria'):
+            base_config.update({
+                'limite_memoria_mb': config.getint('memoria', 'limite_memoria_mb', fallback=8192),
+                'forcar_limpeza_memoria': config.getboolean('memoria', 'forcar_limpeza_memoria', fallback=True),
+                'percentual_max_memoria': config.getint('memoria', 'percentual_max_memoria', fallback=80)
+            })
+        
+        # Faixas etárias
+        if config.has_section('faixas_etarias'):
+            faixas = {}
+            for faixa, valores in config.items('faixas_etarias'):
+                try:
+                    min_idade, max_idade = [int(v.strip()) for v in valores.split(',')]
+                    faixas[faixa] = (min_idade, max_idade)
+                except:
+                    logger.warning(f"Faixa etária inválida: {faixa} = {valores}")
+            base_config['faixas_etarias'] = faixas
+        
+        # Filtros de análise
+        if config.has_section('filtros_analise'):
+            base_config['filtros_analise'] = dict(config.items('filtros_analise'))
+        
+        # Debug/Otimização (fallback para compatibilidade)
         if config.has_section('debug'):
             base_config.update({
-                'amostra_registros': config.getint('debug', 'amostra_registros', fallback=0),
-                'max_workers': config.getint('debug', 'max_workers_otimizado', fallback=None),
-                'usar_paralelo': config.getboolean('debug', 'usar_paralelo', fallback=True)
+                'amostra_registros': config.getint('debug', 'amostra_registros', fallback=base_config.get('amostra_registros', 0)),
+                'max_workers': config.getint('debug', 'max_workers_otimizado', fallback=base_config.get('max_workers')),
+                'usar_paralelo': config.getboolean('debug', 'usar_paralelo', fallback=base_config.get('usar_paralelo', True))
             })
-        else:
-            base_config['usar_paralelo'] = True
         
         return base_config
     

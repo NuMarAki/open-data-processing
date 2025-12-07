@@ -8,27 +8,34 @@ Sistema de processamento e análise de dados do IBGE (PNAD, RAIS, CAGED) com mod
 python app_main.py
 \\\
 
-Menu Principal:
-1. Descompactação de Arquivos
-2. Processar Bases (PNAD, RAIS, CAGED)
-3. Relatórios e Análises
-4. Diagnóstico de Dados
-5. Modelo Preditivo RAIS
-0. Sair
-
 ##  Estrutura
 
-- **app_main.py** - Ponto de entrada
+- **app_main.py** - Ponto de entrada principal
+- **config/** -  Arquivos de configuração (.cfg)
+  - pnad.cfg - Configuração PNAD
+  - rais.cfg - Configuração RAIS  
+  - caged.cfg - Configuração CAGED
 - **menu/** - Classes de menu
 - **modules/** - Módulos funcionais
 - **preditivo_rais/** - Modelo preditivo
 
+##  Configuração
+
+Todos os parâmetros estão centralizados em **config/*.cfg**:
+
+- Períodos de análise (ano_inicio, ano_fim)
+- Caminhos de dados e resultados
+- Parâmetros de processamento (paralelo, workers, batch)
+- Limites de memória
+- Códigos CBO para TI
+- Faixas etárias
+
 ##  Funcionalidades
 
-- Processamento de PNAD, RAIS, CAGED
+- Processamento: PNAD, RAIS, CAGED
 - Análises e diagnósticos
 - 4 tipos de gráficos PNAD
-- Treinar e fazer predições
+- Modelo preditivo (treinar/prever)
 - Descompactação automática
 
 ##  Requisitos

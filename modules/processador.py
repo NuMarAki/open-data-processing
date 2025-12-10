@@ -1,6 +1,8 @@
 """Módulo unificado de processamento de bases"""
 import os
-from processadores_especificos import ProcessadorPNAD, ProcessadorRAIS, ProcessadorCAGED
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from processamento.processadores_especificos import ProcessadorPNAD, ProcessadorRAIS, ProcessadorCAGED
 
 class ProcessadorBases:
     """Interface unificada para processamento de bases"""

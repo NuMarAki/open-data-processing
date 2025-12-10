@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Aplicação Principal - Sistema de Análise de Etarismo em TI
+Aplicacao Principal - Sistema de Analise de Etarismo em TI
 
-Interface interativa refatorada com menus e módulos organizados.
-Mantém total compatibilidade com processamentos anteriores.
+Interface interativa refatorada com menus e modulos organizados.
+Mantem total compatibilidade com processamentos anteriores.
 """
 
 import os
@@ -12,7 +12,13 @@ import sys
 import logging
 from datetime import datetime
 
-# Configurar diretório temporário
+# Configurar encoding para UTF-8
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# Configurar diretorio temporario
 DIRETORIO_TEMP = r'Z:\TCC\TEMP'
 try:
     os.makedirs(DIRETORIO_TEMP, exist_ok=True)
@@ -22,15 +28,16 @@ except OSError as e:
     print(f"Aviso: Erro ao configurar diretório temporário: {e}")
 
 # Importar módulos do projeto
-from utils import verificar_espaco_disco, configurar_log, logger
-from menu import MenuPrincipal, MenuProcessar, MenuRelatorios, MenuDescompactacao
-from modules import (
-    ProcessadorBases, 
-    GeradorRelatorios, 
-    GerenciadorDescompactacao,
-    ModuloPreditivo,
-    GeradorGraficosPNAD
-)
+from scripts.utils import verificar_espaco_disco, configurar_log, logger
+from menu.menu_principal import MenuPrincipal
+from menu.menu_processar import MenuProcessar
+from menu.menu_relatorios import MenuRelatorios
+from menu.menu_descompactacao import MenuDescompactacao
+from modules.processador import ProcessadorBases
+from modules.relatorio import GeradorRelatorios
+from modules.descompactador_module import GerenciadorDescompactacao
+from modules.preditivo import ModuloPreditivo
+from modules.graficos_pnad import GeradorGraficosPNAD
 
 # Configurar logging
 configurar_log()

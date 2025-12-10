@@ -1,33 +1,34 @@
-"""Módulo de funcionalidades do modelo preditivo RAIS"""
+"""Módulo de funcionalidades do modelo preditivo RAIS.
+
+Delega para preditivos.preditivo_rais (script consolidado).
+"""
 import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class ModuloPreditivo:
     """Interface para o modelo preditivo RAIS"""
-    
+
     CAMINHO_PREDITIVO = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), 
-        '..', 'preditivo_rais'
+        os.path.dirname(os.path.abspath(__file__)),
+        '..', 'preditivos', 'artifacts'
     )
-    
+
     @staticmethod
     def treinar_modelo(**kwargs):
         """Treina o modelo preditivo RAIS"""
         try:
             print("\n[*] Iniciando treinamento do modelo preditivo RAIS...")
-            
-            # Adicionar caminho do módulo preditivo ao sys.path
-            if ModuloPreditivo.CAMINHO_PREDITIVO not in sys.path:
-                sys.path.insert(0, ModuloPreditivo.CAMINHO_PREDITIVO)
-            
-            # Importar e executar o módulo preditivo
-            from src.main import main as treinar
+
+            # Usa o script consolidado em preditivos/
+            from preditivos.preditivo_rais import main as treinar
+
             treinar()
-            
-            print("[✓] Modelo treinado com sucesso!")
+
+            print("[OK] Modelo treinado com sucesso!")
             return True
         except Exception as e:
-            print(f"[✗] Erro ao treinar modelo: {e}")
+            print(f"[X] Erro ao treinar modelo: {e}")
             raise
     
     @staticmethod
@@ -35,17 +36,14 @@ class ModuloPreditivo:
         """Realiza predições com o modelo treinado"""
         try:
             print("\n[*] Executando predições...")
-            
-            if ModuloPreditivo.CAMINHO_PREDITIVO not in sys.path:
-                sys.path.insert(0, ModuloPreditivo.CAMINHO_PREDITIVO)
-            
-            from src.main import main as fazer_pred
+
+            from preditivos.preditivo_rais import main as fazer_pred
             resultado = fazer_pred()
-            
-            print("[✓] Predições realizadas com sucesso!")
+
+            print("[OK] Predições realizadas com sucesso!")
             return resultado
         except Exception as e:
-            print(f"[✗] Erro ao fazer predições: {e}")
+            print(f"[X] Erro ao fazer predições: {e}")
             raise
     
     @staticmethod

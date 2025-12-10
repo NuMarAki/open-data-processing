@@ -1,6 +1,9 @@
 """Módulo de gerenciamento de descompactação"""
-from descompactador import Descompactador
-from utils import listar_erros_descompactacao
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from processamento.descompactador import Descompactador
+from scripts.utils import listar_erros_descompactacao
 
 class GerenciadorDescompactacao:
     """Interface unificada para descompactação de arquivos"""

@@ -1,5 +1,8 @@
 """Módulo de geração de relatórios e análises"""
-from processadores_especificos import ProcessadorPNAD, ProcessadorRAIS, ProcessadorCAGED
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from processamento.processadores_especificos import ProcessadorPNAD, ProcessadorRAIS, ProcessadorCAGED
 
 class GeradorRelatorios:
     """Interface unificada para geração de relatórios"""

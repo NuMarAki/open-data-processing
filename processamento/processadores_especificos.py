@@ -470,6 +470,11 @@ class ProcessadorCAGED(ProcessadorBase):
             if 'salario' in df.columns:
                 df['salario'] = pd.to_numeric(df['salario'].str.replace(',', '.'), errors='coerce')
             
+            # Obter lista CBO TI da configuração
+            cbos_ti_cfg = getattr(self.config, 'cbo_ti', None)
+            if not cbos_ti_cfg:
+                logger.warning("Lista cbo_ti não encontrada no config CAGED — classificação pode gerar 0 TI.")
+            
             if PROCESSAMENTO_TI_APLICADO_FLAG not in df.attrs:
                 logger.info("🔧 Aplicando processamento TI (primeira vez)...")
                 from scripts.utils import preparar_dados_ti

@@ -31,11 +31,19 @@ class ProcessadorBases:
     def processar(base: str, **kwargs):
         """Processa uma base de dados"""
         try:
+            from scripts.config_manager import ConfigManager
+            
             processador_class, config_file = ProcessadorBases.obter_processador(base)
             print(f"\n[*] Iniciando processamento de {base.upper()}...")
             print(f"    Configuração: {config_file}")
-            processador = processador_class()
-            resultado = processador.processar(**kwargs)
+            
+            # Carregar configuração
+            config_manager = ConfigManager()
+            config = config_manager.carregar_configuracao(base, config_file)
+            
+            # Instanciar processador com config
+            processador = processador_class(config)
+            resultado = processador.processar_periodo_completo(**kwargs)
             print(f"[✓] {base.upper()} processado com sucesso!")
             return resultado
         except Exception as e:

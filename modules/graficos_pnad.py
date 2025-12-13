@@ -1,5 +1,8 @@
 """Módulo de geração de gráficos específicos da PNAD"""
 import os
+import subprocess
+import time
+import glob
 
 class GeradorGraficosPNAD:
     """Interface para gráficos específicos da PNAD"""
@@ -19,32 +22,106 @@ class GeradorGraficosPNAD:
                 raise ValueError(f"Tipo de gráfico desconhecido: {tipo}")
             
             script = GeradorGraficosPNAD.SCRIPTS_GRAFICOS[tipo]
-            print(f"\n[*] Gerando gráfico: {tipo}...")
+            script_path = os.path.join('graficos_scripts', script)
+            
+            print(f"\n[*] Gerando grafico: {tipo}...")
             print(f"    Executando: {script}")
             
-            # Aqui seria feita a execução do script correspondente
-            # Por enquanto, apenas informamos o que seria feito
-            print(f"[✓] Gráfico '{tipo}' gerado com sucesso!")
-            return True
+            # Executa o script usando subprocess
+            result = subprocess.run(
+                ['python', script_path],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            
+            if result.returncode == 0:
+                print(f"[OK] Grafico '{tipo}' gerado com sucesso!")
+                return True
+            else:
+                print(f"[ERRO] Falha ao gerar grafico '{tipo}'")
+                if result.stderr:
+                    print(f"Erro: {result.stderr[:500]}")
+                return False
+                
         except Exception as e:
-            print(f"[✗] Erro ao gerar gráfico: {e}")
-            raise
+            print(f"[ERRO] Erro ao gerar grafico: {e}")
+            return False
     
     @staticmethod
     def gerar_todos_graficos(**kwargs):
-        """Gera todos os gráficos disponíveis"""
-        print("\n[*] Gerando todos os gráficos PNAD...")
+        """Gera todos os gráficos disponíveis e exibe sumário"""
+        print("\n" + "="*60)
+        print("[*] Executando todos os graficos PNAD...")
+        print("="*60)
         
-        graficos_gerados = {}
-        for tipo in GeradorGraficosPNAD.SCRIPTS_GRAFICOS.keys():
-            try:
-                graficos_gerados[tipo] = GeradorGraficosPNAD.gerar_grafico(tipo, **kwargs)
-            except Exception as e:
-                print(f"[!] Erro ao gerar gráfico '{tipo}': {e}")
-                graficos_gerados[tipo] = False
+        resultados = []
+        tempo_total_inicio = time.time()
         
-        print("[✓] Geração de gráficos concluída!")
-        return graficos_gerados
+        # Executa cada script sequencialmente
+        for idx, (tipo, script) in enumerate(GeradorGraficosPNAD.SCRIPTS_GRAFICOS.items(), 1):
+            print(f"\n[{idx}/4] Processando: {tipo.replace('_', ' ').title()}")
+            script_path = os.path.join('graficos_scripts', script)
+            
+            inicio = time.time()
+            result = subprocess.run(
+                ['python', script_path],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            duracao = time.time() - inicio
+            
+            status = "[OK]" if result.returncode == 0 else "[ERRO]"
+            resultados.append({
+                'tipo': tipo,
+                'script': script,
+                'duracao': duracao,
+                'status': status,
+                'returncode': result.returncode
+            })
+            
+            print(f"     {status} Concluido em {duracao:.1f}s")
+        
+        tempo_total = time.time() - tempo_total_inicio
+        
+        # Exibe sumário
+        print("\n" + "="*60)
+        print("=== SUMARIO DE GERACAO ===")
+        print("="*60)
+        
+        for r in resultados:
+            print(f"{r['status']} {r['script']:<45} {r['duracao']:>6.1f}s")
+        
+        print(f"\nTempo total de execucao: {tempo_total:.1f}s")
+        
+        # Lista arquivos gerados
+        graficos_dir = 'graficos'
+        if os.path.exists(graficos_dir):
+            graficos = glob.glob(os.path.join(graficos_dir, '*.png'))
+            csvs = glob.glob(os.path.join(graficos_dir, '*.csv'))
+            
+            print(f"\n=== ARQUIVOS GERADOS ===")
+            print(f"Total de graficos PNG: {len(graficos)}")
+            print(f"Total de arquivos CSV: {len(csvs)}")
+            print(f"\nArquivos PNG:")
+            for g in sorted(graficos):
+                size_kb = os.path.getsize(g) / 1024
+                print(f"  - {os.path.basename(g):<50} {size_kb:>8.1f} KB")
+            
+            if csvs:
+                print(f"\nArquivos CSV:")
+                for c in sorted(csvs):
+                    size_kb = os.path.getsize(c) / 1024
+                    print(f"  - {os.path.basename(c):<50} {size_kb:>8.1f} KB")
+        
+        print("\n" + "="*60)
+        print("[OK] Geracao de graficos concluida!")
+        print("="*60)
+        
+        return resultados
     
     @staticmethod
     def exibir_opcoes():

@@ -29,24 +29,69 @@ formatter_reais = FuncFormatter(lambda x, pos: f'R$ {_fmt_km(x, pos)}')
 
 def carregar_dados():
     """
-    Carrega os dados da PNAD e faz a limpeza inicial, convertendo colunas para os tipos corretos.
+    Carrega e consolida arquivos preprocessados da PNAD, filtrando anos 2012 e 2024 para otimizar.
     """
-    try:
-        df = pd.read_csv(r'C:\TCC\dados\pnad\dados_pnad_consolidados.csv', sep=';')
-        print("Dados da PNAD consolidado carregados com sucesso.")
-    except FileNotFoundError:
-        print("Erro: O arquivo 'dados_pnad_consolidados.csv' não foi encontrado.")
-        print("Por favor, coloque o arquivo de dados na mesma pasta do script.")
+    import glob
+    
+    # Tentar múltiplos caminhos
+    candidate_paths = [
+        os.path.join(os.path.dirname(__file__), '..', 'dados', 'pnad', 'preprocessados'),
+        'dados/pnad/preprocessados',
+        'z:/TCC/Entrega/open-data-processing/dados/pnad/preprocessados',
+    ]
+    
+    preprocessados_dir = None
+    for path in candidate_paths:
+        abs_path = os.path.abspath(path)
+        if os.path.exists(abs_path):
+            preprocessados_dir = abs_path
+            break
+    
+    if not preprocessados_dir:
+        print("Erro: Pasta 'preprocessados' não encontrada.")
         return None
+    
+    print(f"Carregando arquivos preprocessados de: {preprocessados_dir}")
+    
+    # Encontrar todos os arquivos .csv preprocessados
+    csv_files = glob.glob(os.path.join(preprocessados_dir, '*preprocessado.csv'))
+    
+    if not csv_files:
+        print(f"Erro: Nenhum arquivo preprocessado encontrado em {preprocessados_dir}")
+        return None
+    
+    # Filtrar apenas 2012 e 2024
+    anos_desejados = [2012, 2024]
+    dfs = []
+    for csv_file in sorted(csv_files):
+        basename = os.path.basename(csv_file)
+        try:
+            partes = basename.split('_')
+            if len(partes) >= 2:
+                ano_str = partes[1][2:6]
+                ano = int(ano_str)
+                if ano in anos_desejados:
+                    print(f"  Carregando: {basename}...")
+                    df_temp = pd.read_csv(csv_file, sep=';')
+                    dfs.append(df_temp)
+        except Exception as e:
+            print(f"  Aviso ao carregar {basename}: {e}")
+    
+    if not dfs:
+        print("Erro: Nenhum arquivo foi carregado com sucesso.")
+        return None
+    
+    df = pd.concat(dfs, ignore_index=True)
+    print(f"[OK] Dados consolidados: {len(df)} registros totais")
 
     # Garante que a coluna 'eh_ti' seja booleana / numérica
-    if df['eh_ti'].dtype == 'object':
-        df['eh_ti'] = df['eh_ti'].str.upper().map({'TRUE': True, 'FALSE': False})
-    df['eh_ti'] = pd.to_numeric(df['eh_ti'].astype(object), errors='coerce').fillna(0).astype(int)
+    if 'eh_ti' in df.columns and df['eh_ti'].dtype == 'object':
+        df['eh_ti'] = df['eh_ti'].str.upper().map({'TRUE': True, 'FALSE': False, 'SIM': True, 'NAO': False})
+    df['eh_ti'] = pd.to_numeric(df.get('eh_ti', 0).astype(object), errors='coerce').fillna(0).astype(int)
 
     # Converte colunas de renda e peso para numérico, tratando erros.
-    df['rendimento_bruto_mensal'] = pd.to_numeric(df['rendimento_bruto_mensal'], errors='coerce')
-    df['rendimento_trabalho_principal'] = pd.to_numeric(df['rendimento_trabalho_principal'], errors='coerce')
+    df['rendimento_bruto_mensal'] = pd.to_numeric(df.get('rendimento_bruto_mensal', 0), errors='coerce')
+    df['rendimento_trabalho_principal'] = pd.to_numeric(df.get('rendimento_trabalho_principal', 0), errors='coerce')
     df['peso_populacional'] = pd.to_numeric(df.get('peso_populacional', 0), errors='coerce').fillna(0)
     # coluna ocupado pode não existir em todos os datasets; cria com 0/1 quando ausente
     if 'ocupado' not in df.columns:
@@ -876,7 +921,7 @@ def main():
     df = carregar_dados()
     if df is None:
         return
-    anos_analise = [2012, 2018, 2024]
+    anos_analise = [2012, 2024]
     anos_disponiveis = sorted(df['ano'].unique())
     print(f"\nAnos disponíveis no dataset: {anos_disponiveis}")
     for ano in anos_analise:

@@ -24,19 +24,63 @@ def obter_mapeamento_uf():
     }
 
 def carregar_dados():
-    """Carrega os dados da PNAD de um arquivo CSV."""
-    try:
-        # Tenta carregar do caminho especificado (ajuste se necessário)
-        df = pd.read_csv(r'C:\TCC\dados\pnad\dados_pnad_consolidados.csv', sep=';')
-        print("Dados completos carregados com sucesso.")
-    except FileNotFoundError:
-        print("Arquivo principal não encontrado. Carregando 'amostra_pnad.csv'.")
-        # Se não encontrar, usa o arquivo de amostra
-        df = pd.read_csv('amostra_pnad.csv', sep=';')
-
+    """Carrega e consolida arquivos preprocessados da PNAD, filtrando anos 2012 e 2024 para otimizar."""
+    import glob
+    
+    # Tentar múltiplos caminhos
+    candidate_paths = [
+        os.path.join(os.path.dirname(__file__), '..', 'dados', 'pnad', 'preprocessados'),
+        'dados/pnad/preprocessados',
+        'z:/TCC/Entrega/open-data-processing/dados/pnad/preprocessados',
+    ]
+    
+    preprocessados_dir = None
+    for path in candidate_paths:
+        abs_path = os.path.abspath(path)
+        if os.path.exists(abs_path):
+            preprocessados_dir = abs_path
+            break
+    
+    if not preprocessados_dir:
+        print("Erro: Pasta 'preprocessados' não encontrada.")
+        return None
+    
+    print(f"Carregando arquivos preprocessados de: {preprocessados_dir}")
+    
+    # Encontrar todos os arquivos .csv preprocessados
+    csv_files = glob.glob(os.path.join(preprocessados_dir, '*preprocessado.csv'))
+    
+    if not csv_files:
+        print(f"Erro: Nenhum arquivo preprocessado encontrado em {preprocessados_dir}")
+        return None
+    
+    # Filtrar apenas 2012 e 2024
+    anos_desejados = [2012, 2024]
+    dfs = []
+    for csv_file in sorted(csv_files):
+        basename = os.path.basename(csv_file)
+        try:
+            partes = basename.split('_')
+            if len(partes) >= 2:
+                ano_str = partes[1][2:6]
+                ano = int(ano_str)
+                if ano in anos_desejados:
+                    print(f"  Carregando: {basename}...")
+                    df_temp = pd.read_csv(csv_file, sep=';')
+                    dfs.append(df_temp)
+        except Exception as e:
+            print(f"  Aviso ao carregar {basename}: {e}")
+    
+    if not dfs:
+        print("Erro: Nenhum arquivo foi carregado com sucesso.")
+        return None
+    
+    df = pd.concat(dfs, ignore_index=True)
+    print(f"[OK] Dados consolidados: {len(df)} registros totais")
+    
     # Garante que a coluna 'eh_ti' seja booleana
-    if df['eh_ti'].dtype == 'object':
-        df['eh_ti'] = df['eh_ti'].str.upper().map({'TRUE': True, 'FALSE': False})
+    if 'eh_ti' in df.columns and df['eh_ti'].dtype == 'object':
+        df['eh_ti'] = df['eh_ti'].str.upper().map({'TRUE': True, 'FALSE': False, 'SIM': True, 'NAO': False})
 
     return df
 

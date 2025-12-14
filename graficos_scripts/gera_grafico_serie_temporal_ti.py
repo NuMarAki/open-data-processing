@@ -59,20 +59,14 @@ def carregar_dados():
         print(f"Erro: Nenhum arquivo preprocessado encontrado em {preprocessados_dir}")
         return None
     
-    # Filtrar apenas 2012 e 2024
-    anos_desejados = [2012, 2024]
+    # Carregar TODOS os anos para série temporal
     dfs = []
     for csv_file in sorted(csv_files):
         basename = os.path.basename(csv_file)
         try:
-            partes = basename.split('_')
-            if len(partes) >= 2:
-                ano_str = partes[1][2:6]
-                ano = int(ano_str)
-                if ano in anos_desejados:
-                    print(f"  Carregando: {basename}...")
-                    df_temp = pd.read_csv(csv_file, sep=';')
-                    dfs.append(df_temp)
+            print(f"  Carregando: {basename}...")
+            df_temp = pd.read_csv(csv_file, sep=';')
+            dfs.append(df_temp)
         except Exception as e:
             print(f"  Aviso ao carregar {basename}: {e}")
     

@@ -36,8 +36,33 @@ class GeradorGraficosPNAD:
                 errors='replace'
             )
             
+            # Mostrar output do script (filtrar warnings)
+            if result.stdout:
+                linhas = result.stdout.split('\n')
+                for linha in linhas:
+                    if linha.strip() and 'FutureWarning' not in linha and 'DeprecationWarning' not in linha:
+                        print(f"    {linha}")
+            
             if result.returncode == 0:
                 print(f"[OK] Grafico '{tipo}' gerado com sucesso!")
+                
+                # Listar arquivos gerados recentemente no diretório graficos
+                import glob
+                from datetime import datetime, timedelta
+                graficos_dir = 'graficos'
+                if os.path.exists(graficos_dir):
+                    agora = datetime.now()
+                    arquivos_recentes = []
+                    for arquivo in glob.glob(os.path.join(graficos_dir, '*.png')) + glob.glob(os.path.join(graficos_dir, '*.csv')):
+                        mtime = datetime.fromtimestamp(os.path.getmtime(arquivo))
+                        if (agora - mtime).total_seconds() < 60:  # Gerados nos últimos 60 segundos
+                            arquivos_recentes.append(os.path.basename(arquivo))
+                    
+                    if arquivos_recentes:
+                        print(f"\n    Arquivos gerados (pasta 'graficos'):")
+                        for arq in sorted(arquivos_recentes):
+                            print(f"      - {arq}")
+                
                 return True
             else:
                 print(f"[ERRO] Falha ao gerar grafico '{tipo}'")

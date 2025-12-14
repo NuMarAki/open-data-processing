@@ -1,198 +1,64 @@
-# 🔄 Refatoração do Sistema de Análise de Etarismo em TI
+﻿# Open Data Processing
 
-## 📋 Resumo das Mudanças
+Ferramenta para operar três bases públicas (PNAD, RAIS e CAGED) em um só lugar: descompactar, processar, inspecionar, gerar gráficos e treinar modelos preditivos.
 
-### Problemas Resolvidos
-- ✅ **Duplicação de código eliminada** - Métodos similares consolidados
-- ✅ **Complexidade reduzida** - Classes menores com responsabilidades únicas
-- ✅ **Hierarquia simplificada** - Herança mais clara e lógica
-- ✅ **Configuração centralizada** - Gerenciamento unificado de configurações
-- ✅ **Separação de responsabilidades** - Descompactação isolada do processamento
+## O que o projeto faz
 
-### Nova Estrutura de Arquivos
+- **Descompactação**: descompacta os arquivos brutos e organiza em pastas de trabalho.
+- **Processamento**: normaliza e consolida PNAD, RAIS e CAGED para uso em análises e modelos.
+- **Diagnóstico**: verifica cobertura de colunas, tamanho dos dados e possíveis faltas/inconsistências.
+- **Gráficos PNAD**: escolaridade x sexo, renda x estudo, comparativo por UF e série temporal completa.
+- **Modelos preditivos**:
+	- RAIS: prevê vínculo ativo em 31/12.
+	- PNAD: classifica renda >= 6 salários mínimos (ajustado por ano), com pesos amostrais.
 
-```
-projeto/
-├── config_manager.py           # Gerenciamento centralizado de configurações
-├── descompactador.py          # Lógica isolada de descompactação
-├── processador_base.py        # Classe base simplificada
-├── processadores_especificos.py # PNAD, RAIS e CAGED em um arquivo
-├── processar_dados.py         # Script unificado de execução
-├── utils_comum_refatorado.py # Utilitários simplificados
-└── analise_etarismo.py       # (mantido sem alterações)
-```
+## Como rodar
 
-## 🚀 Como Usar o Sistema Refatorado
+1) Pré-requisitos: Python 3.8+ e dados nas pastas esperadas (dados/pnad, dados/rais, dados/caged).
+2) Execute o menu interativo:
 
-### Processamento Individual
 ```bash
-# Processar uma base específica
-python processar_dados.py pnad
-python processar_dados.py rais
-python processar_dados.py caged
-
-# Processar com análise automática
-python processar_dados.py pnad --analise
+python app_main.py
 ```
 
-### Processamento Completo
-```bash
-# Processar todas as bases
-python processar_dados.py todas
+No menu você encontra:
+- Descompactação das três bases.
+- Processamento completo por base ou todas.
+- Relatórios e gráficos PNAD.
+- Módulo preditivo: RAIS (opções 1–3) e PNAD 6 SM (opções 10, 20, 21, 30). Use a opção 21 para modo rápido (amostra reduzida).
 
-# Processar todas com análise
-python processar_dados.py todas --analise
+## Organização do projeto
+
+- app_main.py — ponto de entrada com menus.
+- config/*.cfg — caminhos e parâmetros de cada base.
+- menu/ — navegação de console.
+- modules/ — processadores, relatórios, diagnósticos, preditivo.
+- preditivo_rais/ — pacote do modelo RAIS (artefatos e código).
+
+## Configuração (CFG)
+
+Arquivos em `config/` controlam caminhos e parâmetros:
+
+- `pnad.cfg`: pastas `dados/pnad/raw` e `dados/pnad/preprocessados`, anos de início/fim, separador (`;`), chunk/tamanho de lote.
+- `rais.cfg`: pastas `dados/rais/raw` e `dados/rais/preprocessados`, limites de memória/arquivos, mapeamento de colunas e CBO.
+- `caged.cfg`: pastas de entrada/saída do CAGED e opções de parsing.
+
+Para mudar onde estão os compactados (brutos), edite a seção de caminhos no cfg correspondente, por exemplo em `pnad.cfg`:
+
+```
+[paths]
+raw_dir = D:/meus_dados/pnad/zip     ; onde ficam os .zip/.7z/.rar
+out_dir = D:/meus_dados/pnad/        ; saída dos descompactados e preprocessados
 ```
 
-### Opções Avançadas
-```bash
-# Especificar arquivo de log
-python processar_dados.py rais --log rais_processamento.log
+Depois rode o menu normalmente; os módulos de descompactação e processamento usarão os novos caminhos.
 
-# Ver ajuda
-python processar_dados.py --help
-```
+## Notas rápidas
 
-## 🔧 Principais Melhorias
+- Saídas ficam em resultados/<base>/...
+- PNAD preprocessados esperados em dados/pnad/preprocessados.
+- Para reduzir tempo no PNAD preditivo, use o modo rápido (opção 21) ou passe `--sample-frac` ao script.
 
-### 1. **ConfigManager** - Configuração Centralizada
-- Singleton para gerenciar todas as configurações
-- Carregamento lazy (sob demanda)
-- Validação automática de parâmetros
-- Suporte a configurações específicas por base
+## Requisitos
 
-### 2. **Descompactador** - Responsabilidade Única
-- Focado apenas em descompactação
-- Cache inteligente integrado
-- Suporte a múltiplos formatos (.7z, .zip)
-- Validação de integridade
-
-### 3. **ProcessadorBase** - Simplificado
-- Template Method Pattern claro
-- Métodos abstratos bem definidos
-- Paralelização adaptativa automática
-- Gerenciamento de recursos integrado
-
-### 4. **Processadores Específicos** - Consolidados
-- Um arquivo para todos os processadores
-- Herança clara do ProcessadorBase
-- Lógica específica isolada
-- Descoberta automática de arquivos
-
-### 5. **Script Unificado** - Facilidade de Uso
-- Um único ponto de entrada
-- Argumentos de linha de comando
-- Processamento sequencial ou individual
-- Integração automática com análise
-
-## 📊 Comparação de Código
-
-### Antes (múltiplos arquivos de processamento):
-```python
-# processar_pnad.py (150+ linhas)
-# processar_rais.py (150+ linhas)  
-# processar_caged.py (150+ linhas)
-# Muita duplicação entre os três
-```
-
-### Depois (script unificado):
-```python
-# processar_dados.py (100 linhas)
-# Reutiliza toda a lógica comum
-```
-
-### Antes (ETL com 2000+ linhas):
-```python
-# etl_bases.py
-class ProcessadorBase:
-    # Fazia tudo: descompactação, cache, processamento, etc
-```
-
-### Depois (responsabilidades separadas):
-```python
-# processador_base.py (300 linhas)
-# descompactador.py (200 linhas)
-# Cada classe com uma responsabilidade clara
-```
-
-## 🛠️ Migração do Código Antigo
-
-Para migrar do sistema antigo:
-
-1. **Backup seus dados e configurações**
-2. **Copie os novos arquivos** para o diretório do projeto
-3. **Mantenha os arquivos .cfg** sem alterações
-4. **Execute o novo script**:
-   ```bash
-   python processar_dados.py todas
-   ```
-
-Os arquivos de cache e dados preprocessados serão aproveitados automaticamente.
-
-## 📈 Benefícios da Refatoração
-
-### Manutenibilidade
-- **50% menos código** para manter
-- **Bugs corrigidos em um lugar** afetam todas as bases
-- **Testes mais simples** com classes menores
-
-### Performance
-- **Mesma velocidade** de processamento
-- **Melhor uso de memória** com limpeza otimizada
-- **Paralelização mais eficiente** com controle centralizado
-
-### Extensibilidade
-- **Adicionar nova base** requer apenas um novo processador
-- **Modificar comportamento** é mais simples com herança clara
-- **Novos recursos** podem ser adicionados na classe base
-
-## 🔍 Exemplo de Extensão
-
-Para adicionar suporte a uma nova base de dados:
-
-```python
-# Em processadores_especificos.py
-class ProcessadorNOVABASE(ProcessadorBase):
-    def descobrir_arquivos(self) -> List[str]:
-        # Lógica para encontrar arquivos
-        pass
-    
-    def processar_arquivo(self, arquivo: str) -> pd.DataFrame:
-        # Lógica para processar arquivo
-        pass
-
-# Em processar_dados.py, adicionar ao mapeamento:
-processadores = {
-    'pnad': (ProcessadorPNAD, 'colunas_pnad.cfg'),
-    'rais': (ProcessadorRAIS, 'colunas_rais.cfg'),
-    'caged': (ProcessadorCAGED, 'colunas_caged.cfg'),
-    'novabase': (ProcessadorNOVABASE, 'colunas_novabase.cfg')  # Nova!
-}
-```
-
-## ⚡ Performance e Recursos
-
-A refatoração mantém todas as otimizações originais:
-- Cache inteligente com validação
-- Processamento paralelo adaptativo
-- Gestão automática de memória
-- Limpeza de recursos após uso
-
-## 🤝 Compatibilidade
-
-- ✅ **100% compatível** com dados existentes
-- ✅ **Arquivos .cfg** continuam iguais
-- ✅ **Cache existente** é aproveitado
-- ✅ **Outputs** no mesmo formato
-
-## 📝 Próximos Passos Sugeridos
-
-1. **Testes Unitários**: Criar testes para cada componente
-2. **Documentação de API**: Docstrings mais detalhadas
-3. **Logging Estruturado**: Migrar para formato JSON
-4. **Configuração YAML**: Alternativa aos arquivos .cfg
-5. **Pipeline CI/CD**: Automação de testes e deploy
-
----
-
-**Nota**: Esta refatoração mantém todas as funcionalidades existentes enquanto melhora significativamente a estrutura e manutenibilidade do código.
+- Python 3.8 ou superior.

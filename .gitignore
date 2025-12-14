@@ -19,3 +19,5 @@
 *.pyc
 __init__.py
 /artifacts/
+/temporario/
+/resultados/

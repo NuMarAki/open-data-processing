@@ -316,23 +316,44 @@ def _collect_from_dir(rais_dir: str, patterns: List[str], rows_per_file: Optiona
         print(f"    linhas lidas: {len(raw):,} (acumulado bruto: {total_rows:,})")
         norm = _normalize_rais_df(raw)
         df_parts.append(norm)
+        del raw  # Liberar memória
+        import gc
+        gc.collect()
+    print(f"{PREFIX} Concatenando {len(df_parts)} DataFrames...")
     df_all = pd.concat(df_parts, ignore_index=True)
     print(f"{PREFIX} Total concatenado (normalizado): {len(df_all):,} linhas")
+    del df_parts  # Liberar memória da lista de partes
+    gc.collect()
 
-    print(f"\n\n{PREFIX} Estatísticas para Consolidados PNAD - Sem peso populacional aplicado:")
-    describe_df = df_all.describe().T
-    print(tabulate(describe_df.reset_index().values.tolist(), headers=[""] + list(describe_df.columns), tablefmt='psql', showindex=False, floatfmt=".2f"))
+    print(f"\n{PREFIX} Calculando estatísticas descritivas (pode demorar)...")
+    try:
+        describe_df = df_all.describe().T
+        print(tabulate(describe_df.reset_index().values.tolist(), headers=[""] + list(describe_df.columns), tablefmt='psql', showindex=False, floatfmt=".2f"))
+    except Exception as e:
+        print(f"{PREFIX} [aviso] Erro ao calcular estatísticas: {e}")
 
     return df_all
 
 
 def treinar_avaliar(df: pd.DataFrame, features_num: List[str], features_cat: List[str], out_dir: Path, prefix: str,
-                    n_boot: int = 50, n_repeats_perm: int = 3):
+                    n_boot: int = 50, n_repeats_perm: int = 3, sample_frac: Optional[float] = None):
     # Montar X e y
     y = preparar_y(df)
     X = df[features_num + features_cat].copy()
     mask = y.notna()
     X, y = X.loc[mask], y.loc[mask].astype(int)
+
+    # Amostragem após limpeza (igual código original)
+    if sample_frac is not None:
+        if not (0.0 < sample_frac <= 1.0):
+            raise ValueError("sample_frac deve estar entre (0, 1]")
+        original_len = len(X)
+        idx_sample = X.sample(frac=sample_frac, random_state=42).index
+        X = X.loc[idx_sample]
+        y = y.loc[idx_sample]
+        print(f"{PREFIX} Amostragem aplicada: {original_len:,} -> {len(X):,} linhas ({sample_frac*100:.1f}%)")
+    else:
+        print(f"{PREFIX} Sem amostragem. Usando todos os dados: {len(X):,} linhas")
 
     strat = y if y.nunique() > 1 else None
 
@@ -474,13 +495,14 @@ def main():
     configurar_ambiente(os.path.join("resultados", "rais", "ativo_3112"))
 
     ap = argparse.ArgumentParser(description="Predição RAIS (multi-arquivos): probabilidade de estar ativo em 31/12")
-    ap.add_argument("--rais-dir", default=r"C:\\TCC\\dados\\rais\\preprocessados", help="Diretório com arquivos RAIS")
-    ap.add_argument("--rows-per-file", type=int, default=None, help="Amostrar no máx. N linhas por arquivo (controle de memória)")
-    ap.add_argument("--max-files", type=int, default=None, help="Limitar a N arquivos (debug)")
-    ap.add_argument("--patterns", default="*_processado_ti.parquet,*_processado_ti.csv",
+    ap.add_argument("--rais-dir", default=os.path.join("dados", "rais", "preprocessados"), help="Diretório com arquivos RAIS")
+    ap.add_argument("--rows-per-file", type=int, default=None, help="Amostrar no máx. N linhas por arquivo (None = todas). Use valores baixos (ex: 50000) se tiver pouca RAM")
+    ap.add_argument("--max-files", type=int, default=None, help="Limitar a N arquivos (None = todos). Use para debug ou memória limitada")
+    ap.add_argument("--patterns", default="*_processado_ti.parquet,*_processado_ti.csv,*_processado.csv",
                     help="Padrões de arquivo separados por vírgula")
     ap.add_argument("--ex-ante", action="store_true", help="Ativar modo ex-ante (excluir vazamentos). Padrão: ativado.", default=True)
     ap.add_argument("--usar-cnae-subclasse", action="store_true", help="Incluir cnae_20_subclasse (alta cardinalidade)", default=False)
+    ap.add_argument("--sample-frac", type=float, default=None, help="Fração de amostragem APÓS carregar arquivos (ex: 0.5 = 50%%). Use None para todos os dados. Padrão: None (100%%)")
     ap.add_argument("--n-boot", type=int, default=50, help="N bootstraps p/ estabilidade")
     ap.add_argument("--n-repeats", type=int, default=3, help="n_repeats do permutation importance")
     args = ap.parse_args()
@@ -490,8 +512,15 @@ def main():
     print(f"{PREFIX} Padrões: {patterns}")
     if args.rows_per_file:
         print(f"{PREFIX} Amostragem por arquivo: {args.rows_per_file} linhas")
+    else:
+        print(f"{PREFIX} [!] AVISO: Carregando TODOS os arquivos COMPLETOS. Isso pode consumir muita RAM.")
     if args.max_files:
         print(f"{PREFIX} Limite de arquivos: {args.max_files}")
+
+    if args.sample_frac and args.sample_frac < 1.0:
+        print(f"{PREFIX} [!] Amostragem final: {args.sample_frac*100:.1f}% dos dados após carregar")
+    else:
+        print(f"{PREFIX} [!] Usando 100% dos dados (sem amostragem)")
 
     df = _collect_from_dir(args.rais_dir, patterns, args.rows_per_file, args.max_files)
     features_num, features_cat = selecionar_features(df, ex_ante=args.ex_ante, usar_cnae_subclasse=args.usar_cnae_subclasse)
@@ -500,7 +529,8 @@ def main():
     prefix = "rais_ativo_3112"
 
     metrics = treinar_avaliar(df, features_num, features_cat, out_dir, prefix,
-                              n_boot=args.n_boot, n_repeats_perm=args.n_repeats)
+                              n_boot=args.n_boot, n_repeats_perm=args.n_repeats,
+                              sample_frac=args.sample_frac)
     print(f"{PREFIX} Treino concluído. Resultados em: {out_dir.resolve()}")
     print(f"{PREFIX} Resumo -> Acc={metrics['acc']:.3f} Prec={metrics['prec']:.3f} Rec={metrics['rec']:.3f} F1={metrics['f1']:.3f} ROC={metrics['roc']:.3f} PR-AUC={metrics['ap']:.3f}")
 

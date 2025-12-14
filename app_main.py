@@ -38,6 +38,7 @@ from modules.relatorio import GeradorRelatorios
 from modules.descompactador_module import GerenciadorDescompactacao
 from modules.preditivo import ModuloPreditivo
 from modules.graficos_pnad import GeradorGraficosPNAD
+from modules.diagnostico import executar_diagnostico
 
 # Configurar logging
 configurar_log()
@@ -206,21 +207,33 @@ class AplicacaoPrincipal:
     
     def menu_preditivo_interativo(self):
         """Menu interativo para o modelo preditivo"""
-        print("\n--- Modelo Preditivo RAIS ---")
-        print("1. Informações do Modelo")
-        print("2. Treinar Modelo")
-        print("3. Fazer Predições")
-        print("0. Voltar")
-        
+        print("\n--- Modelo Preditivo ---")
+        print("          #RAIS#                  |                #PNAD#")
+        print(" 1. Informações do Modelo RAIS    | 10. Informações do Modelo PNAD (6 SM)")
+        print(" 2. Treinar Modelo RAIS           | 20. Treinar Modelo PNAD (6 SM)")
+        print(" 3. Fazer Predições RAIS          | 21. Treinar PNAD (6 SM) - Modo Rápido (50%)")
+        print("                                  | 30. Fazer Predições PNAD (6 SM)")
+        print("---------------------------------------------------------------")    
+        print(" 0. Voltar")
+
         opcao = input("\nEscolha uma opção: ").strip()
-        
+
         try:
             if opcao == '1':
-                ModuloPreditivo.exibir_info()
+                ModuloPreditivo.info_rais()
             elif opcao == '2':
-                ModuloPreditivo.treinar_modelo()
+                ModuloPreditivo.treinar_rais()
             elif opcao == '3':
-                ModuloPreditivo.fazer_predicoes()
+                ModuloPreditivo.predizer_rais()
+            elif opcao == '10':
+                ModuloPreditivo.info_pnad_salario_6sm()
+            elif opcao == '20':
+                ModuloPreditivo.treinar_pnad_salario_6sm()
+            elif opcao == '21':
+                # Modo rápido: 25% amostragem, 100 árvores, max_depth=15
+                ModuloPreditivo.treinar_pnad_salario_6sm(fast=True)
+            elif opcao == '30':
+                ModuloPreditivo.predizer_pnad_salario_6sm()
             elif opcao == '0':
                 return
             else:
@@ -229,11 +242,7 @@ class AplicacaoPrincipal:
             logger.error(f"Erro no módulo preditivo: {e}")
     
     def executar_diagnostico(self):
-        """Executa diagnóstico dos dados"""
-        print("\n[*] Executando diagnóstico dos dados...")
-        print("    Verificando integridade das bases...")
-        print("    Analisando estatísticas...")
-        print("[✓] Diagnóstico concluído!")
+        executar_diagnostico()
     
     def executar(self):
         """Loop principal da aplicação"""

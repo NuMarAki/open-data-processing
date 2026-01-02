@@ -211,7 +211,7 @@ class AplicacaoPrincipal:
         print("          #RAIS#                  |                #PNAD#")
         print(" 1. Informações do Modelo RAIS    | 10. Informações do Modelo PNAD (6 SM)")
         print(" 2. Treinar Modelo RAIS           | 20. Treinar Modelo PNAD (6 SM)")
-        print(" 3. Fazer Predições RAIS          | 21. Treinar PNAD (6 SM) - Modo Rápido (50%)")
+        print(" 3. Gerar Métricas RAIS (sem treino) | 21. Treinar PNAD (6 SM) - Modo Rápido (50%)")
         print("                                  | 30. Fazer Predições PNAD (6 SM)")
         print("---------------------------------------------------------------")    
         print(" 0. Voltar")

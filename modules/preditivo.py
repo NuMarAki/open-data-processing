@@ -72,7 +72,37 @@ class ModuloPreditivo:
 
     @staticmethod
     def predizer_rais(**kwargs):
-        return ModuloPreditivo.fazer_predicoes(**kwargs)
+        """Gera métricas/tabela do RAIS sem retreinar.
+
+        Reaproveita o arquivo resultados/rais/ativo_3112/rais_ativo_3112_predicoes_teste.csv.
+        """
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'preditivos', 'preditivo_rais.py')
+        script_path = os.path.abspath(script_path)
+
+        pred_csv = os.path.join('resultados', 'rais', 'ativo_3112', 'rais_ativo_3112_predicoes_teste.csv')
+        if not os.path.exists(pred_csv):
+            print(f"[X] Arquivo de predições não encontrado: {pred_csv}")
+            print("    Execute a opção 2 (Treinar Modelo RAIS) pelo menos uma vez para gerar o CSV de predições.")
+            return False
+
+        cmd = [sys.executable, script_path, '--somente-metricas', '--predicoes-csv', pred_csv]
+        print("\n[*] Gerando métricas/tabela do RAIS (sem retreinar)...")
+        print(f"    Usando predições: {pred_csv}")
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+            if result.returncode == 0:
+                print("[OK] Métricas/tabela geradas em: resultados/rais/ativo_3112/")
+                return True
+            print(f"[X] Falha ao gerar métricas/tabela (rc={result.returncode})")
+            return False
+        except Exception as e:
+            print(f"[X] Erro ao gerar métricas/tabela do RAIS: {e}")
+            return False
 
     # ------------------ PNAD 6 SM ------------------
     @staticmethod

@@ -30,7 +30,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
-    roc_auc_score, average_precision_score
+    roc_auc_score, average_precision_score, balanced_accuracy_score
 )
 from sklearn.inspection import permutation_importance
 import sys
@@ -63,6 +63,98 @@ def _coerce_num(s, to_int=False):
         except Exception:
             return x.astype("Int64")
     return x
+
+
+def _safe_metric(fn, *args, **kwargs):
+    try:
+        return float(fn(*args, **kwargs))
+    except Exception:
+        return float("nan")
+
+
+def _write_metrics_table(out_dir: Path, prefix: str, metrics_rows):
+    """Salva tabela de métricas em CSV + PNG (formato simples, tipo planilha)."""
+    metrics_df = pd.DataFrame(metrics_rows, columns=["Métrica", "Valor"])
+    metrics_df.to_csv(out_dir / f"{prefix}_metricas.csv", index=False, sep=";")
+
+    fig, ax = plt.subplots(figsize=(6.0, 2.6), dpi=200)
+    ax.axis("off")
+    table = ax.table(
+        cellText=[[m, ("nan" if (isinstance(v, float) and np.isnan(v)) else f"{v:.4f}")] for m, v in metrics_rows],
+        colLabels=["Métrica", "Valor"],
+        cellLoc="left",
+        colLoc="left",
+        loc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1.0, 1.2)
+    fig.tight_layout()
+    fig.savefig(str(out_dir / f"{prefix}_tabela_metricas.png"), bbox_inches="tight")
+    plt.close(fig)
+
+
+def gerar_metricas_de_predicoes_csv(predicoes_csv: Path, out_dir: Path, prefix: str) -> Dict[str, float]:
+    """Gera métricas (e tabela) a partir de um CSV de predições já salvo.
+
+    Espera colunas: y_true, y_proba, y_pred_0_5 (ou calcula y_pred a partir de y_proba).
+    """
+    dfp = pd.read_csv(predicoes_csv, sep=";", low_memory=True)
+    if "y_true" not in dfp.columns:
+        raise ValueError(f"CSV não possui coluna 'y_true': {predicoes_csv}")
+    if "y_proba" not in dfp.columns and "y_pred_0_5" not in dfp.columns:
+        raise ValueError("CSV precisa ter 'y_proba' e/ou 'y_pred_0_5'.")
+
+    y_true_series = pd.Series(pd.to_numeric(dfp["y_true"], errors="coerce"))
+    y_true_series = y_true_series.dropna().astype(int)
+    y_true = y_true_series
+    dfp = dfp.loc[y_true.index]
+
+    y_proba = None
+    if "y_proba" in dfp.columns:
+        y_proba = pd.Series(pd.to_numeric(dfp["y_proba"], errors="coerce"))
+
+    if "y_pred_0_5" in dfp.columns:
+        y_pred = pd.Series(pd.to_numeric(dfp["y_pred_0_5"], errors="coerce"))
+    elif y_proba is not None:
+        y_pred = (y_proba >= 0.5).astype("int64")
+    else:
+        raise ValueError("Não foi possível obter y_pred.")
+
+    y_pred = pd.Series(y_pred).fillna(0).astype(int)
+
+    acc = _safe_metric(accuracy_score, y_true, y_pred)
+    bal_acc = _safe_metric(balanced_accuracy_score, y_true, y_pred)
+    prec = _safe_metric(precision_score, y_true, y_pred, zero_division=0)
+    rec = _safe_metric(recall_score, y_true, y_pred, zero_division=0)
+    f1 = _safe_metric(f1_score, y_true, y_pred, zero_division=0)
+
+    roc = float("nan")
+    ap = float("nan")
+    if y_proba is not None:
+        roc = _safe_metric(roc_auc_score, y_true, y_proba)
+        ap = _safe_metric(average_precision_score, y_true, y_proba)
+
+    metrics_rows = [
+        ("Acurácia", acc),
+        ("Acurácia balanceada", bal_acc),
+        ("Precisão", prec),
+        ("Recall", rec),
+        ("F1-score", f1),
+        ("ROC AUC", roc),
+        ("PR AUC", ap),
+    ]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write_metrics_table(out_dir, prefix, metrics_rows)
+
+    with open(out_dir / "resumo_metricas_de_predicoes.txt", "w", encoding="utf-8") as f:
+        f.write(f"Fonte predições: {predicoes_csv}\n")
+        vals, cnts = np.unique(y_true, return_counts=True)
+        f.write(f"Distribuição y_true: {dict(zip(map(int, vals), map(int, cnts)))}\n\n")
+        for m, v in metrics_rows:
+            f.write(f"{m}: {v:.6f}\n" if not (isinstance(v, float) and np.isnan(v)) else f"{m}: nan\n")
+
+    return {"acc": acc, "bal_acc": bal_acc, "prec": prec, "rec": rec, "f1": f1, "roc": roc, "ap": ap}
 
 
 ALVO_CANDIDATOS = [
@@ -400,6 +492,7 @@ def treinar_avaliar(df: pd.DataFrame, features_num: List[str], features_cat: Lis
 
     # Métricas
     acc = accuracy_score(y_test, y_pred)
+    bal_acc = balanced_accuracy_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred, zero_division=0)
     rec = recall_score(y_test, y_pred, zero_division=0)
     f1 = f1_score(y_test, y_pred, zero_division=0)
@@ -414,6 +507,21 @@ def treinar_avaliar(df: pd.DataFrame, features_num: List[str], features_cat: Lis
 
     out_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipe, out_dir / "modelo.joblib")
+
+    # Tabela de métricas (CSV + PNG) para uso em relatório/TCC
+    try:
+        metrics_rows = [
+            ("Acurácia", float(acc)),
+            ("Acurácia balanceada", float(bal_acc)),
+            ("Precisão", float(prec)),
+            ("Recall", float(rec)),
+            ("F1-score", float(f1)),
+            ("ROC AUC", float(roc)),
+            ("PR AUC", float(ap)),
+        ]
+        _write_metrics_table(out_dir, prefix, metrics_rows)
+    except Exception as e:
+        print(f"[aviso] Não foi possível gerar tabela de métricas (CSV/PNG): {e}")
 
     # Predições
     meta_cols = [c for c in ["uf","idade","sexo_trabalhador","escolaridade_pnad","cnae_20_classe","cbo_familia","vl_remun_media_nom","qtd_hora_contr","tempo_emprego"] if c in X_test.columns]
@@ -475,7 +583,7 @@ def treinar_avaliar(df: pd.DataFrame, features_num: List[str], features_cat: Lis
         vals, cnts = np.unique(y_test, return_counts=True)
         f.write(f"Distribuição teste: {dict(zip(map(int, vals), map(int, cnts)))}\n\n")
         f.write("Métricas (não ponderadas):\n")
-        f.write(f"  Acc: {acc:.4f}  Prec: {prec:.4f}  Rec: {rec:.4f}  F1: {f1:.4f}\n")
+        f.write(f"  Acc: {acc:.4f}  BalAcc: {bal_acc:.4f}  Prec: {prec:.4f}  Rec: {rec:.4f}  F1: {f1:.4f}\n")
         if not np.isnan(roc): f.write(f"  ROC AUC: {roc:.4f}\n")
         if not np.isnan(ap):  f.write(f"  PR AUC: {ap:.4f}\n")
         # seção top-20 estabilidade
@@ -495,6 +603,8 @@ def main():
     configurar_ambiente(os.path.join("resultados", "rais", "ativo_3112"))
 
     ap = argparse.ArgumentParser(description="Predição RAIS (multi-arquivos): probabilidade de estar ativo em 31/12")
+    ap.add_argument("--somente-metricas", action="store_true", help="Não treina; apenas gera tabela de métricas a partir do CSV de predições já salvo")
+    ap.add_argument("--predicoes-csv", default=None, help="Caminho do CSV de predições (se omitido, usa resultados/rais/ativo_3112/rais_ativo_3112_predicoes_teste.csv)")
     ap.add_argument("--rais-dir", default=os.path.join("dados", "rais", "preprocessados"), help="Diretório com arquivos RAIS")
     ap.add_argument("--rows-per-file", type=int, default=None, help="Amostrar no máx. N linhas por arquivo (None = todas). Use valores baixos (ex: 50000) se tiver pouca RAM")
     ap.add_argument("--max-files", type=int, default=None, help="Limitar a N arquivos (None = todos). Use para debug ou memória limitada")
@@ -506,6 +616,16 @@ def main():
     ap.add_argument("--n-boot", type=int, default=50, help="N bootstraps p/ estabilidade")
     ap.add_argument("--n-repeats", type=int, default=3, help="n_repeats do permutation importance")
     args = ap.parse_args()
+
+    out_dir = Path("resultados") / "rais" / "ativo_3112"
+    prefix = "rais_ativo_3112"
+
+    if args.somente_metricas:
+        pred_csv = Path(args.predicoes_csv) if args.predicoes_csv else (out_dir / f"{prefix}_predicoes_teste.csv")
+        print(f"{PREFIX} Gerando métricas a partir de: {pred_csv}")
+        gerar_metricas_de_predicoes_csv(pred_csv, out_dir=out_dir, prefix=prefix)
+        print(f"{PREFIX} OK. Arquivos gerados em: {out_dir}")
+        return
 
     patterns = [p.strip() for p in args.patterns.split(",") if p.strip()]
     print(f"{PREFIX} Varredura em: {args.rais_dir}")
@@ -524,9 +644,6 @@ def main():
 
     df = _collect_from_dir(args.rais_dir, patterns, args.rows_per_file, args.max_files)
     features_num, features_cat = selecionar_features(df, ex_ante=args.ex_ante, usar_cnae_subclasse=args.usar_cnae_subclasse)
-
-    out_dir = Path("resultados") / "rais" / "ativo_3112"
-    prefix = "rais_ativo_3112"
 
     metrics = treinar_avaliar(df, features_num, features_cat, out_dir, prefix,
                               n_boot=args.n_boot, n_repeats_perm=args.n_repeats,

@@ -103,7 +103,7 @@ A validação cruzada estratificada foi escolhida para:
 - **Divisão**: 75% treino / 25% teste
 - **Estratificação**: Baseada na variável alvo
 - **Configuração**: `test_size=0.25, random_state=42, stratify=y`
-- **Implementação**: Ver [preditivos/preditivo_rais.py](preditivos/preditivo_rais.py#L383-L385)
+- **Implementação**: Ver [preditivos/preditivo_rais.py](preditivos/preditivo_rais.py#L475-L477)
 
 **Hiperparâmetros e justificativas (RAIS)**
 - **`n_estimators=500`**: melhora a estabilidade da predição por média de muitas árvores (reduz variância), mantendo custo computacional aceitável.

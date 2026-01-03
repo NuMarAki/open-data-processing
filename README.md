@@ -120,7 +120,7 @@ A validação hold-out foi adotada devido ao:
 2. Custo computacional elevado para k-fold cross-validation com Random Forest
 3. Representatividade suficiente com 25% dos dados para teste
 
-**Métricas reportadas**: Acurácia, Precisão, Recall, F1-Score, ROC-AUC, Average Precision
+**Métricas reportadas**: Acurácia, Acurácia balanceada (Balanced Accuracy), Precisão, Recall, F1-Score, ROC-AUC, Average Precision
 
 ## Relação com Empregabilidade e Etarismo
 
